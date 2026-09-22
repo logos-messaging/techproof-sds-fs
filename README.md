@@ -31,6 +31,7 @@ cargo test -p sds-fs-poc --test fuzz -- --nocapture
 | Header Substitution | header opens only on its own content; tampering fails | `header_is_bound_to_its_content` |
 | Associated Data and Binding | replay is an SDS duplicate | `replayed_frame_is_a_duplicate` |
 | Member removal | headers for `LAG + 1` epochs, never content | `removed_member_reads_headers_for_lag_more_epochs_and_no_content` |
+| Member removal | no header past removal + `LAG`, live or from the store, ever (LAG 0..=3) | `removed_member_eventually_cannot_read_headers` |
 | Compromised Reliability Keys | removed member can forge headers inside its window only | `removed_member_can_forge_headers_inside_its_window_only` |
 | Security, Retention | stolen state at `E` exposes `E..=E+LAG` only | `compromise_at_epoch_e_exposes_only_e_through_e_plus_lag` |
 | Security, Retention | ring holds exactly `LAG + 1` keys | `ring_holds_exactly_lag_plus_one_keys` |

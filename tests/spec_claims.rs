@@ -231,6 +231,53 @@ fn removed_member_reads_headers_for_lag_more_epochs_and_no_content() {
     assert_eq!(texts(sim.member("raya")).len(), 3);
 }
 
+/// Member removal: header access ends LAG epochs after the removal and never returns.
+/// The ring freezes at removal, so of the whole archive the removed member opens only
+/// headers sealed in the removal epoch through LAG more.
+#[test]
+fn removed_member_eventually_cannot_read_headers() {
+    for lag in 0..=3 {
+        let mut sim = Sim::new(lag, "saro");
+        sim.invite("saro", "raya"); // 1
+        sim.invite("saro", "tom"); // 2
+        let removed = sim.remove("saro", "tom").epoch;
+        let window = removed..=removed + lag;
+        let held = sim.member("tom").ring().held_epochs();
+        assert_eq!(held, window.clone().collect::<Vec<_>>());
+
+        for _ in 0..lag + 5 {
+            let sent = sim.send("raya", "after tom");
+            let opened = sim.receipt("tom").unwrap().opened().is_some();
+            assert_eq!(
+                opened,
+                window.contains(&sent.epoch),
+                "lag {lag}, epoch {}",
+                sent.epoch
+            );
+            sim.rotate("saro");
+        }
+
+        let tom = sim.member("tom");
+        assert_eq!(
+            tom.ring().held_epochs(),
+            held,
+            "lag {lag}: no keys after removal"
+        );
+        assert!(tom.delivered().is_empty());
+        let readable: BTreeSet<_> = sim
+            .ledger()
+            .iter()
+            .filter(|p| {
+                tom.ring()
+                    .open(p.frame.header.as_ref().unwrap(), &p.frame.content)
+                    .is_some()
+            })
+            .map(|p| p.epoch)
+            .collect();
+        assert_eq!(readable, window.collect(), "lag {lag}");
+    }
+}
+
 /// Compromised Reliability Keys: inside its window a removed member can forge headers that
 /// members accept. It cannot forge content; the harm is fetches for messages that don't exist.
 #[test]
